@@ -1,12 +1,12 @@
 .git
 
 ### Server related
-# Sensitive data
-config/
-storage/**/*.json
-storage/db.sqlite*
-logs/**/*.log
-logs/*
+# Sensitive data (allowing for build context)
+# config/
+# storage/**/*.json
+# storage/db.sqlite*
+# logs/**/*.log
+# logs/*
 
 ### Python related
 # Virtual environments

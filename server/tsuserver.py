@@ -23,6 +23,7 @@ from aiohttp import web
 import websockets
 import geoip2.database
 import os
+import json
 import mimetypes
 import yaml
 import logging
@@ -49,7 +50,7 @@ class TsuServer3:
         'background': ['.png', '.gif'],
         'characters': ['.png', '.gif', '.apng', '.webp', '.webp.static'],
     }
-    ROOT_ASSET_FILES = {'extensions.json', 'evidence.json'}
+    ROOT_ASSET_FILES = {'extensions.json', 'evidence.json', 'characters.json', 'backgrounds.json'}
 
     def __init__(self):
         self.software = 'tsuserver3'
@@ -474,6 +475,16 @@ class TsuServer3:
             headers.append(('Content-Type', 'text/plain; charset=utf-8'))
             return (502, headers, b'Fallback asset fetch failed')
 
+    def build_generated_asset_json(self, relative_path: str):
+        normalized = relative_path.strip('/').casefold()
+        if normalized == 'characters.json':
+            payload = self.char_list or []
+            return json.dumps(payload).encode('utf-8')
+        if normalized == 'backgrounds.json':
+            payload = self.backgrounds or []
+            return json.dumps(payload).encode('utf-8')
+        return None
+
     async def handle_http_request(self, path: str, method: str = 'GET'):
         parsed = urlsplit(path)
         if parsed.path == '/healthz':
@@ -506,6 +517,22 @@ class TsuServer3:
             ('Access-Control-Allow-Origin', '*'),
             ('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS'),
         ]
+        generated_json = self.build_generated_asset_json(relative_path)
+        if generated_json is not None:
+            headers.extend([
+                ('Cache-Control', 'no-store'),
+                ('Content-Type', 'application/json; charset=utf-8'),
+            ])
+            return (200, headers, generated_json)
+
+        # Avoid remote fallback directory indexes; only serve concrete files.
+        if relative_path.endswith('/'):
+            headers.extend([
+                ('Cache-Control', 'no-store'),
+                ('Content-Type', 'text/plain; charset=utf-8'),
+            ])
+            return (404, headers, b'Not found')
+
         asset_path = self.find_local_asset(relative_path)
         if asset_path is not None and asset_path.is_file():
             cache_control = 'public, max-age=31536000'

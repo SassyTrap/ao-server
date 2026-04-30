@@ -35,7 +35,7 @@ from server.client_manager import ClientManager
 from server.emotes import Emotes
 from server.exceptions import ClientError,ServerError
 from server.network.aoprotocol import AOProtocol
-from server.network.aoprotocol_ws import new_websocket_client
+from server.network.aoprotocol_ws import AOProtocolAioHTTP, new_websocket_client
 from server.network.masterserverclient import MasterServerClient
 
 logger = logging.getLogger('debug')
@@ -131,11 +131,56 @@ class TsuServer3:
                     return response
                 return None
 
-            ao_server_ws = websockets.serve(new_websocket_client(self),
-                                            bound_ip,
-                                            self.config['websocket_port'],
-                                            process_request=process_request)
-            asyncio.ensure_future(ao_server_ws)
+            if os.environ.get('PORT'):
+                async def handle_web_request(request):
+                    # Handle CORS preflight checks used by webAO asset probing.
+                    if request.method == 'OPTIONS':
+                        return aiohttp.web.Response(
+                            status=204,
+                            headers={
+                                'Access-Control-Allow-Origin': '*',
+                                'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+                                'Access-Control-Allow-Headers': '*',
+                            }
+                        )
+
+                    ws_probe = aiohttp.web.WebSocketResponse().can_prepare(request)
+                    if ws_probe.ok:
+                        websocket = aiohttp.web.WebSocketResponse()
+                        await websocket.prepare(request)
+                        client = AOProtocolAioHTTP(self, websocket, request)
+                        while client.ws_connected:
+                            await client.ws_handle()
+                        return websocket
+
+                    response = await self.handle_http_request(
+                        request.path_qs, method=request.method)
+                    if response is None:
+                        return aiohttp.web.Response(
+                            status=404,
+                            text='Not found',
+                            headers={'Access-Control-Allow-Origin': '*'},
+                        )
+
+                    status, headers, body = response
+                    response_headers = {key: value for key, value in headers}
+                    if request.method == 'HEAD':
+                        return aiohttp.web.Response(status=status, headers=response_headers)
+                    return aiohttp.web.Response(status=status, headers=response_headers, body=body)
+
+                app = aiohttp.web.Application()
+                app.router.add_route('*', '/{path_info:.*}', handle_web_request)
+                runner = aiohttp.web.AppRunner(app)
+                loop.run_until_complete(runner.setup())
+                site = aiohttp.web.TCPSite(
+                    runner, bound_ip, self.config['websocket_port'])
+                loop.run_until_complete(site.start())
+            else:
+                ao_server_ws = websockets.serve(new_websocket_client(self),
+                                                bound_ip,
+                                                self.config['websocket_port'],
+                                                process_request=process_request)
+                asyncio.ensure_future(ao_server_ws)
 
         if self.config['use_masterserver']:
             self.ms_client = MasterServerClient(self)
@@ -417,10 +462,18 @@ class TsuServer3:
             headers.append(('Content-Type', 'text/plain; charset=utf-8'))
             return (502, headers, b'Fallback asset fetch failed')
 
-    async def handle_http_request(self, path: str):
+    async def handle_http_request(self, path: str, method: str = 'GET'):
         parsed = urlsplit(path)
         if parsed.path == '/healthz':
-            return (200, [('Content-Type', 'text/plain')], b'OK\n')
+            return (
+                200,
+                [
+                    ('Content-Type', 'text/plain'),
+                    ('Access-Control-Allow-Origin', '*'),
+                    ('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS'),
+                ],
+                b'OK\n'
+            )
 
         asset_prefixes = (
             f'/{self.ASSET_ROUTE_SEGMENT}/',
@@ -437,7 +490,10 @@ class TsuServer3:
         if relative_path is None:
             return None
 
-        headers = [('Access-Control-Allow-Origin', '*')]
+        headers = [
+            ('Access-Control-Allow-Origin', '*'),
+            ('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS'),
+        ]
         asset_path = self.find_local_asset(relative_path)
         if asset_path is not None and asset_path.is_file():
             cache_control = 'public, max-age=31536000'

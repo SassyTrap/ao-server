@@ -18,6 +18,7 @@
 import asyncio
 
 from websockets import ConnectionClosed
+from aiohttp import WSMsgType
 
 from server.network.aoprotocol import AOProtocol
 
@@ -99,3 +100,71 @@ def new_websocket_client(server):
             await client.ws_handle()
 
     return func
+
+
+class AOProtocolAioHTTP(AOProtocol):
+    """An aiohttp websocket wrapper around AOProtocol."""
+
+    class TransportWrapper:
+        """A class to wrap aiohttp WebSocketResponse transport behavior."""
+
+        def __init__(self, websocket, request):
+            self.ws = websocket
+            self.request = request
+
+        def get_extra_info(self, key):
+            """Get extra info about the client.
+            Used for getting the remote address.
+
+            :param key: requested key
+
+            """
+            peername = None
+            transport = self.request.transport
+            if transport is not None:
+                peername = transport.get_extra_info('peername')
+            info = {'peername': peername}
+            return info.get(key)
+
+        def write(self, message):
+            """Write message to the socket.
+
+            :param message: message in bytes
+
+            """
+            message = message.decode('utf-8')
+            asyncio.ensure_future(self.ws_try_writing_message(message))
+
+        def close(self):
+            """Disconnect the client by force."""
+            asyncio.ensure_future(self.ws.close())
+
+        async def ws_try_writing_message(self, message):
+            """Try writing if the client has not closed the connection."""
+            if self.ws.closed:
+                return
+            await self.ws.send_str(message)
+
+    def __init__(self, server, websocket, request):
+        super().__init__(server)
+        self.ws = websocket
+        self.request = request
+        self.ws_connected = True
+        self.connection_made(self.TransportWrapper(self.ws, self.request))
+
+    async def ws_handle(self):
+        try:
+            message = await self.ws.receive()
+            if message.type == WSMsgType.TEXT:
+                self.data_received(message.data)
+            elif message.type == WSMsgType.BINARY:
+                self.data_received(message.data)
+            elif message.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING):
+                self.ws_connected = False
+                self.connection_lost(None)
+            elif message.type == WSMsgType.ERROR:
+                self.ws_connected = False
+                self.connection_lost(self.ws.exception())
+        except Exception as exc:
+            self.ws_connected = False
+            self.connection_lost(exc)

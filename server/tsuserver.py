@@ -21,8 +21,11 @@ import asyncio
 import websockets
 import geoip2.database
 import os
+import mimetypes
 import yaml
 import logging
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 import server.logger
 from server import database
@@ -38,6 +41,8 @@ logger = logging.getLogger('debug')
 
 class TsuServer3:
     """The main class for tsuserver3 server software."""
+    ASSET_FALLBACK_URL = 'https://attorneyoffline.de/base/'
+
     def __init__(self):
         self.software = 'tsuserver3'
         self.release = 3
@@ -113,18 +118,16 @@ class TsuServer3:
             print(f"Render detected: Disabling TCP port {self.config['port']} to focus on WebSockets.")
 
         if self.config['use_websockets']:
-            # The websockets.serve already handles HTTP GET requests by default (with a 404 or similar).
-            # However, Render expects a 200 OK.
-            # We can provide a process_request hook to handle health checks.
-            async def health_check(path, request_headers):
-                if path == "/healthz":
-                    return (200, [], b"OK\n")
+            async def process_request(path, request_headers):
+                response = self.handle_http_request(path)
+                if response is not None:
+                    return response
                 return None
 
             ao_server_ws = websockets.serve(new_websocket_client(self),
                                             bound_ip,
                                             self.config['websocket_port'],
-                                            process_request=health_check)
+                                            process_request=process_request)
             asyncio.ensure_future(ao_server_ws)
 
         if self.config['use_masterserver']:
@@ -282,6 +285,12 @@ class TsuServer3:
             self.config['masterserver_custom_hostname'] = render_hostname
         if render_port and not self.config.get('masterserver_ws_port'):
             self.config['masterserver_ws_port'] = 443
+        if not self.config.get('asset_url'):
+            render_url = os.environ.get('RENDER_EXTERNAL_URL')
+            if render_url:
+                self.config['asset_url'] = render_url.rstrip('/') + '/assets/'
+            elif render_hostname:
+                self.config['asset_url'] = f'https://{render_hostname}/assets/'
 
     def load_characters(self):
         """Load the character list from a YAML file."""
@@ -289,6 +298,78 @@ class TsuServer3:
             self.char_list = yaml.safe_load(chars)
         self.build_char_pages_ao1()
         self.char_emotes = {char: Emotes(char) for char in self.char_list}
+
+    @staticmethod
+    def _guess_asset_content_type(path: Path) -> str:
+        custom_types = {
+            '.apng': 'image/apng',
+            '.gif': 'image/gif',
+            '.ini': 'text/plain; charset=utf-8',
+            '.ogg': 'audio/ogg',
+            '.opus': 'audio/ogg',
+            '.png': 'image/png',
+            '.webp': 'image/webp',
+        }
+        return custom_types.get(path.suffix.lower(),
+                                mimetypes.guess_type(str(path))[0]
+                                or 'application/octet-stream')
+
+    @staticmethod
+    def _resolve_casefold_path(root: Path, parts):
+        current = root
+        for part in parts:
+            if part in ('', '.', '..'):
+                return None
+            try:
+                current = next(
+                    candidate for candidate in current.iterdir()
+                    if candidate.name.casefold() == part.casefold()
+                )
+            except (StopIteration, FileNotFoundError, NotADirectoryError):
+                return None
+        return current
+
+    def find_local_asset(self, relative_path: str):
+        decoded_path = unquote(relative_path).replace('\\', '/')
+        parts = Path(decoded_path).parts
+        if not parts:
+            return None
+        
+        root_dir = parts[0].casefold()
+        if root_dir in ('characters', 'music'):
+            return self._resolve_casefold_path(Path(root_dir), parts[1:])
+        
+        return None
+
+    def build_fallback_asset_url(self, relative_path: str, query: str) -> str:
+        fallback = self.ASSET_FALLBACK_URL + relative_path.lstrip('/')
+        if query:
+            fallback += f'?{query}'
+        return fallback
+
+    def handle_http_request(self, path: str):
+        parsed = urlsplit(path)
+        if parsed.path == '/healthz':
+            return (200, [('Content-Type', 'text/plain')], b'OK\n')
+
+        if not parsed.path.startswith('/assets/'):
+            return None
+
+        relative_path = parsed.path[len('/assets/'):]
+        headers = [('Access-Control-Allow-Origin', '*')]
+        asset_path = self.find_local_asset(relative_path)
+        if asset_path is not None and asset_path.is_file():
+            headers.extend([
+                ('Cache-Control', 'public, max-age=31536000'),
+                ('Content-Type', self._guess_asset_content_type(asset_path)),
+            ])
+            with open(asset_path, 'rb') as asset_file:
+                return (200, headers, asset_file.read())
+
+        headers.append(
+            ('Location',
+             self.build_fallback_asset_url(relative_path, parsed.query)))
+        return (302, headers, b'')
 
     def load_music(self):
         self.build_music_list()

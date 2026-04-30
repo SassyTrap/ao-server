@@ -6,6 +6,7 @@
 # storage/GeoLite*
 # logs/**/*.log
 # logs/*
+# music/
 
 ### Python related
 # Virtual environments

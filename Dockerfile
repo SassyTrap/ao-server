@@ -12,6 +12,7 @@ COPY characters/ characters/
 COPY config/ config/
 COPY storage/ storage/
 COPY logs/ logs/
+COPY music/ music/
 
 CMD ["python", "-u", "./start_server.py"]
 

@@ -49,8 +49,12 @@ use_masterserver: true
 masterserver_name: Ace Attorney Online Server
 masterserver_description: A brand new AO server hosted on Render!
 # Custom IP address/hostname to use on the server list.
-# For Render, set this to your Render service URL (e.g. my-ao-server.onrender.com)
-masterserver_custom_hostname: my-ao-server.onrender.com
+# For Render, this can be left blank and auto-detected from
+# RENDER_EXTERNAL_HOSTNAME.
+masterserver_custom_hostname:
+# Public websocket port to advertise on the server list.
+# On Render, this can be left blank and will default to 443 automatically.
+masterserver_ws_port:
 
 # Timeout for dead connections (in seconds).
 # To prevent issues, this value should be greater than 60.

@@ -65,10 +65,11 @@ class MasterServerClient:
             'players': self.server.player_count
         }
 
-        if 'masterserver_custom_hostname' in cfg:
+        if cfg.get('masterserver_custom_hostname'):
             body['ip'] = cfg['masterserver_custom_hostname']
         if cfg['use_websockets']:
-            body['ws_port'] = cfg['websocket_port']
+            body['ws_port'] = cfg.get('masterserver_ws_port') or \
+                cfg['websocket_port']
 
         async with http.post(f'{API_BASE_URL}/servers', json=body) as res:
             err_body = await res.text()

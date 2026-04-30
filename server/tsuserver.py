@@ -276,6 +276,13 @@ class TsuServer3:
             except ValueError:
                 pass
 
+        render_hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+        configured_hostname = self.config.get('masterserver_custom_hostname')
+        if render_hostname and not configured_hostname:
+            self.config['masterserver_custom_hostname'] = render_hostname
+        if render_port and not self.config.get('masterserver_ws_port'):
+            self.config['masterserver_ws_port'] = 443
+
     def load_characters(self):
         """Load the character list from a YAML file."""
         with open('config/characters.yaml', 'r', encoding='utf-8') as chars:

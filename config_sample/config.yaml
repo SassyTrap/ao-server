@@ -49,7 +49,11 @@ use_masterserver: true
 masterserver_name: My First Server
 masterserver_description: This is my flashy new server
 # Custom IP address/hostname to use on the server list
+# For Render, this can usually be left blank and auto-detected from
+# RENDER_EXTERNAL_HOSTNAME.
 # masterserver_custom_hostname: ao.example.com
+# Public websocket port to advertise on the server list.
+# masterserver_ws_port: 443
 
 # Timeout for dead connections (in seconds).
 # To prevent issues, this value should be greater than 60.

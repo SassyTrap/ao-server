@@ -73,11 +73,13 @@ class AOProtocolWS(AOProtocol):
 
     def ws_on_connect(self):
         """Handle a new client connection."""
+        print(f"DEBUG: New WebSocket client connected from {self.ws.remote_address}")
         self.connection_made(self.TransportWrapper(self.ws))
 
     async def ws_handle(self):
         try:
             data = await self.ws.recv()
+            print(f"DEBUG: Received from client: {data}")
             self.data_received(data)
         except Exception as exc:
             # Any event handled in data_received could raise any exception

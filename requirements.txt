@@ -1,5 +1,6 @@
 oyaml
 websockets
+aiohttp
 arrow
 timeparse-plus
 geoip2

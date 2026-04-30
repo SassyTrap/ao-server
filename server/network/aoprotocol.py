@@ -100,7 +100,7 @@ class AOProtocol(asyncio.Protocol):
             # try to decode as utf-8, ignore any erroneous characters
             self.buffer += buf.decode('utf-8', 'ignore')
         else:
-            self.buffer = buf
+            self.buffer += buf
 
         self.buffer = self.buffer.translate({ord(c): None for c in '\0'})
 

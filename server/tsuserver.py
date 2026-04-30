@@ -43,6 +43,10 @@ logger = logging.getLogger('debug')
 class TsuServer3:
     """The main class for tsuserver3 server software."""
     ASSET_FALLBACK_URL = 'https://attorneyoffline.de/base/'
+    ASSET_EXTENSION_CANDIDATES = {
+        'background': ['.png', '.gif'],
+        'characters': ['.png', '.gif', '.apng', '.webp', '.webp.static'],
+    }
 
     def __init__(self):
         self.software = 'tsuserver3'
@@ -330,16 +334,31 @@ class TsuServer3:
                 return None
         return current
 
-    def find_local_asset(self, relative_path: str):
+    def iter_asset_relative_paths(self, relative_path: str):
         decoded_path = unquote(relative_path).replace('\\', '/')
-        parts = Path(decoded_path).parts
-        if not parts:
-            return None
-        
-        root_dir = parts[0].casefold()
-        if root_dir in ('characters', 'music'):
-            return self._resolve_casefold_path(Path(root_dir), parts[1:])
-        
+        normalized = Path(decoded_path)
+        yield normalized.as_posix()
+
+        root_dir = normalized.parts[0].casefold() if normalized.parts else ''
+        has_suffix = any(suffix for suffix in normalized.suffixes)
+        if has_suffix:
+            return
+
+        for suffix in self.ASSET_EXTENSION_CANDIDATES.get(root_dir, []):
+            yield f'{normalized.as_posix()}{suffix}'
+
+    def find_local_asset(self, relative_path: str):
+        for candidate_path in self.iter_asset_relative_paths(relative_path):
+            parts = Path(candidate_path).parts
+            if not parts:
+                continue
+
+            root_dir = parts[0].casefold()
+            if root_dir in ('characters', 'music'):
+                asset_path = self._resolve_casefold_path(Path(root_dir), parts[1:])
+                if asset_path is not None:
+                    return asset_path
+
         return None
 
     def build_fallback_asset_url(self, relative_path: str, query: str) -> str:
@@ -349,29 +368,41 @@ class TsuServer3:
         return fallback
 
     async def fetch_fallback_asset(self, relative_path: str, query: str):
-        fallback_url = self.build_fallback_asset_url(relative_path, query)
         headers = [('Access-Control-Allow-Origin', '*')]
         timeout = aiohttp.ClientTimeout(total=15)
 
         try:
             async with aiohttp.ClientSession(timeout=timeout) as http:
-                async with http.get(fallback_url) as res:
-                    body = await res.read()
-                    if res.status >= 400:
-                        logger.warning(
-                            f'Fallback asset request failed: {fallback_url} -> {res.status}'
-                        )
-                    content_type = res.headers.get('Content-Type',
-                                                   'application/octet-stream')
-                    cache_control = res.headers.get('Cache-Control',
-                                                    'public, max-age=3600')
+                fallback_response = None
+                for candidate_path in self.iter_asset_relative_paths(relative_path):
+                    fallback_url = self.build_fallback_asset_url(candidate_path, query)
+                    async with http.get(fallback_url) as res:
+                        body = await res.read()
+                        if res.status < 400:
+                            content_type = res.headers.get(
+                                'Content-Type', 'application/octet-stream')
+                            cache_control = res.headers.get(
+                                'Cache-Control', 'public, max-age=3600')
+                            headers.extend([
+                                ('Content-Type', content_type),
+                                ('Cache-Control', cache_control),
+                            ])
+                            return (res.status, headers, body)
+
+                        fallback_response = (fallback_url, res.status, body)
+
+                if fallback_response is not None:
+                    fallback_url, status, body = fallback_response
+                    logger.warning(
+                        f'Fallback asset request failed: {fallback_url} -> {status}'
+                    )
                     headers.extend([
-                        ('Content-Type', content_type),
-                        ('Cache-Control', cache_control),
+                        ('Content-Type', 'text/plain; charset=utf-8'),
+                        ('Cache-Control', 'public, max-age=60'),
                     ])
-                    return (res.status, headers, body)
+                    return (status, headers, body)
         except aiohttp.ClientError as exc:
-            logger.warning(f'Fallback asset request failed: {fallback_url} ({exc})')
+            logger.warning(f'Fallback asset request failed for {relative_path} ({exc})')
             headers.append(('Content-Type', 'text/plain; charset=utf-8'))
             return (502, headers, b'Fallback asset fetch failed')
 

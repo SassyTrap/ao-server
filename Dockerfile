@@ -13,5 +13,5 @@ COPY config/ config/
 COPY storage/ storage/
 COPY logs/ logs/
 
-CMD ["python", "./start_server.py"]
+CMD ["python", "-u", "./start_server.py"]
 

@@ -20,6 +20,7 @@ import importlib
 import asyncio
 import websockets
 import geoip2.database
+import os
 import yaml
 import logging
 
@@ -266,7 +267,6 @@ class TsuServer3:
             self.config['asset_url'] = None
 
         # Render compatibility: override websocket_port with PORT env var
-        import os
         render_port = os.environ.get('PORT')
         if render_port:
             try:

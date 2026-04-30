@@ -19,6 +19,7 @@ import sys
 import importlib
 import asyncio
 import aiohttp
+from aiohttp import web
 import websockets
 import geoip2.database
 import os
@@ -135,7 +136,7 @@ class TsuServer3:
                 async def handle_web_request(request):
                     # Handle CORS preflight checks used by webAO asset probing.
                     if request.method == 'OPTIONS':
-                        return aiohttp.web.Response(
+                        return web.Response(
                             status=204,
                             headers={
                                 'Access-Control-Allow-Origin': '*',
@@ -144,9 +145,9 @@ class TsuServer3:
                             }
                         )
 
-                    ws_probe = aiohttp.web.WebSocketResponse().can_prepare(request)
+                    ws_probe = web.WebSocketResponse().can_prepare(request)
                     if ws_probe.ok:
-                        websocket = aiohttp.web.WebSocketResponse()
+                        websocket = web.WebSocketResponse()
                         await websocket.prepare(request)
                         client = AOProtocolAioHTTP(self, websocket, request)
                         while client.ws_connected:
@@ -156,7 +157,7 @@ class TsuServer3:
                     response = await self.handle_http_request(
                         request.path_qs, method=request.method)
                     if response is None:
-                        return aiohttp.web.Response(
+                        return web.Response(
                             status=404,
                             text='Not found',
                             headers={'Access-Control-Allow-Origin': '*'},
@@ -165,14 +166,14 @@ class TsuServer3:
                     status, headers, body = response
                     response_headers = {key: value for key, value in headers}
                     if request.method == 'HEAD':
-                        return aiohttp.web.Response(status=status, headers=response_headers)
-                    return aiohttp.web.Response(status=status, headers=response_headers, body=body)
+                        return web.Response(status=status, headers=response_headers)
+                    return web.Response(status=status, headers=response_headers, body=body)
 
-                app = aiohttp.web.Application()
+                app = web.Application()
                 app.router.add_route('*', '/{path_info:.*}', handle_web_request)
-                runner = aiohttp.web.AppRunner(app)
+                runner = web.AppRunner(app)
                 loop.run_until_complete(runner.setup())
-                site = aiohttp.web.TCPSite(
+                site = web.TCPSite(
                     runner, bound_ip, self.config['websocket_port'])
                 loop.run_until_complete(site.start())
             else:

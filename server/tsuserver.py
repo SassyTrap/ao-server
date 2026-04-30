@@ -43,6 +43,7 @@ logger = logging.getLogger('debug')
 class TsuServer3:
     """The main class for tsuserver3 server software."""
     ASSET_FALLBACK_URL = 'https://attorneyoffline.de/base/'
+    ASSET_ROUTE_SEGMENT = 'assets-v2'
     ASSET_EXTENSION_CANDIDATES = {
         'background': ['.png', '.gif'],
         'characters': ['.png', '.gif', '.apng', '.webp', '.webp.static'],
@@ -294,9 +295,13 @@ class TsuServer3:
         if not self.config.get('asset_url'):
             render_url = os.environ.get('RENDER_EXTERNAL_URL')
             if render_url:
-                self.config['asset_url'] = render_url.rstrip('/') + '/assets/'
+                self.config['asset_url'] = (
+                    render_url.rstrip('/') + f'/{self.ASSET_ROUTE_SEGMENT}/'
+                )
             elif render_hostname:
-                self.config['asset_url'] = f'https://{render_hostname}/assets/'
+                self.config['asset_url'] = (
+                    f'https://{render_hostname}/{self.ASSET_ROUTE_SEGMENT}/'
+                )
 
     def load_characters(self):
         """Load the character list from a YAML file."""
@@ -417,15 +422,27 @@ class TsuServer3:
         if parsed.path == '/healthz':
             return (200, [('Content-Type', 'text/plain')], b'OK\n')
 
-        if not parsed.path.startswith('/assets/'):
+        asset_prefixes = (
+            f'/{self.ASSET_ROUTE_SEGMENT}/',
+            '/assets/',
+        )
+        relative_path = None
+        for prefix in asset_prefixes:
+            if parsed.path.startswith(prefix):
+                relative_path = parsed.path[len(prefix):]
+                break
+
+        if relative_path is None:
             return None
 
-        relative_path = parsed.path[len('/assets/'):]
         headers = [('Access-Control-Allow-Origin', '*')]
         asset_path = self.find_local_asset(relative_path)
         if asset_path is not None and asset_path.is_file():
+            cache_control = 'public, max-age=31536000'
+            if asset_path.name in self.ROOT_ASSET_FILES:
+                cache_control = 'no-store'
             headers.extend([
-                ('Cache-Control', 'public, max-age=31536000'),
+                ('Cache-Control', cache_control),
                 ('Content-Type', self._guess_asset_content_type(asset_path)),
             ])
             with open(asset_path, 'rb') as asset_file:

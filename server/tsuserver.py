@@ -111,7 +111,7 @@ class TsuServer3:
             # However, Render expects a 200 OK.
             # We can provide a process_request hook to handle health checks.
             async def health_check(path, request_headers):
-                if path == "/healthz" or path == "/":
+                if path == "/healthz":
                     return (200, [], b"OK\n")
                 return None
 

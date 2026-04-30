@@ -107,9 +107,18 @@ class TsuServer3:
         ao_server = loop.run_until_complete(ao_server_crt)
 
         if self.config['use_websockets']:
+            # The websockets.serve already handles HTTP GET requests by default (with a 404 or similar).
+            # However, Render expects a 200 OK.
+            # We can provide a process_request hook to handle health checks.
+            async def health_check(path, request_headers):
+                if path == "/healthz" or path == "/":
+                    return (200, [], b"OK\n")
+                return None
+
             ao_server_ws = websockets.serve(new_websocket_client(self),
                                             bound_ip,
-                                            self.config['websocket_port'])
+                                            self.config['websocket_port'],
+                                            process_request=health_check)
             asyncio.ensure_future(ao_server_ws)
 
         if self.config['use_masterserver']:
@@ -249,6 +258,17 @@ class TsuServer3:
             self.config['default_ban_duration'] = '6 hours'
         if 'asset_url' not in self.config:
             self.config['asset_url'] = None
+
+        # Render compatibility: override websocket_port with PORT env var
+        import os
+        render_port = os.environ.get('PORT')
+        if render_port:
+            try:
+                self.config['websocket_port'] = int(render_port)
+                self.config['use_websockets'] = True
+                print(f"Render detected: overriding websocket_port to {render_port}")
+            except ValueError:
+                pass
 
     def load_characters(self):
         """Load the character list from a YAML file."""

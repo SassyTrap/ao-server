@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ao-server
+    env: docker
+    plan: free
+    healthCheckPath: /
+    # The health check might fail because tsuserver3 doesn't have an HTTP endpoint
+    # However, Render's health check can be configured to just check if the port is open
+    # Or we can disable it if possible. 
+    # For now, let's keep it simple.
+    envVars:
+      - key: PORT
+        value: 10000

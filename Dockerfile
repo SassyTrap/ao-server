@@ -10,6 +10,7 @@ COPY server/ server/
 COPY migrations/ migrations/
 COPY characters/ characters/
 COPY config/ config/
+COPY extensions.json ./
 COPY storage/ storage/
 COPY logs/ logs/
 COPY music/ music/

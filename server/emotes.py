@@ -2,7 +2,7 @@ import logging
 
 from pathlib import Path
 from typing import Union, List
-from configparser import ConfigParser, SectionProxy
+from configparser import ConfigParser, SectionProxy, Error as ConfigParserError
 logger = logging.getLogger('debug')
 
 
@@ -34,21 +34,26 @@ class Emotes:
     @staticmethod
     def _create_config_parser() -> ConfigParser:
         return ConfigParser(comment_prefixes=('#', ';', '//', '\\\\'),
-                            strict=False)
+                            strict=False,
+                            allow_no_value=True)
 
     def _read_ini(self) -> Union[ConfigParser, None]:
         char_ini = self._create_config_parser()
 
         char_path = Path(self.CHAR_DIR, self.name, 'char.ini')
         if char_path.exists():
-            with open(char_path) as file:
-                char_ini.read_file(file)
+            try:
+                with open(char_path, encoding='utf-8') as file:
+                    char_ini.read_file(file)
+            except ConfigParserError as exc:
+                logger.warning(f'Failed to parse {char_path}: {exc}')
+                return None
             if self._has_valid_ini_sections(char_ini):
                 return char_ini
             else:
-                logger.warn(f'{char_path} does not have the required sections')
+                logger.warning(f'{char_path} does not have the required sections')
         else:
-            logger.warn(f'Character file {char_path} not found')
+            logger.warning(f'Character file {char_path} not found')
 
         return None
 
@@ -56,7 +61,7 @@ class Emotes:
         char_ini = self._read_ini()
         if char_ini is not None:
             if self._is_valid_emotions_section(char_ini['Emotions']) is False:
-                logger.warn('Emotions needs a number section')
+                logger.warning('Emotions needs a number section')
                 return
 
             total_char_emotions = char_ini['Emotions'].getint('number')

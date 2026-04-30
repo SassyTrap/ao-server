@@ -102,9 +102,14 @@ class TsuServer3:
         if self.config['local']:
             bound_ip = '127.0.0.1'
 
-        ao_server_crt = loop.create_server(lambda: AOProtocol(self), bound_ip,
-                                           self.config['port'])
-        ao_server = loop.run_until_complete(ao_server_crt)
+        # Render compatibility: Disable normal TCP port if we are using the Render port for WebSockets
+        if not os.environ.get('PORT'):
+            ao_server_crt = loop.create_server(lambda: AOProtocol(self), bound_ip,
+                                               self.config['port'])
+            ao_server = loop.run_until_complete(ao_server_crt)
+        else:
+            ao_server = None
+            print(f"Render detected: Disabling TCP port {self.config['port']} to focus on WebSockets.")
 
         if self.config['use_websockets']:
             # The websockets.serve already handles HTTP GET requests by default (with a 404 or similar).
@@ -144,8 +149,9 @@ class TsuServer3:
 
         database.log_misc('stop')
 
-        ao_server.close()
-        loop.run_until_complete(ao_server.wait_closed())
+        if ao_server:
+            ao_server.close()
+            loop.run_until_complete(ao_server.wait_closed())
         loop.close()
 
     async def schedule_unbans(self):

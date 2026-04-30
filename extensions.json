@@ -6,8 +6,8 @@
   "emote_extensions": [
     ".gif",
     ".png",
-    ".apng",
     ".webp",
+    ".apng",
     ".webp.static"
   ],
   "emotions_extensions": [

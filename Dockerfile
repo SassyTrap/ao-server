@@ -14,6 +14,7 @@ COPY extensions.json ./
 COPY storage/ storage/
 COPY logs/ logs/
 COPY music/ music/
+COPY background/ background/
 
 CMD ["python", "-u", "./start_server.py"]
 

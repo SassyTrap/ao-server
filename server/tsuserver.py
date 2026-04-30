@@ -18,6 +18,7 @@
 import sys
 import importlib
 import asyncio
+import aiohttp
 import websockets
 import geoip2.database
 import os
@@ -119,7 +120,7 @@ class TsuServer3:
 
         if self.config['use_websockets']:
             async def process_request(path, request_headers):
-                response = self.handle_http_request(path)
+                response = await self.handle_http_request(path)
                 if response is not None:
                     return response
                 return None
@@ -347,7 +348,34 @@ class TsuServer3:
             fallback += f'?{query}'
         return fallback
 
-    def handle_http_request(self, path: str):
+    async def fetch_fallback_asset(self, relative_path: str, query: str):
+        fallback_url = self.build_fallback_asset_url(relative_path, query)
+        headers = [('Access-Control-Allow-Origin', '*')]
+        timeout = aiohttp.ClientTimeout(total=15)
+
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as http:
+                async with http.get(fallback_url) as res:
+                    body = await res.read()
+                    if res.status >= 400:
+                        logger.warning(
+                            f'Fallback asset request failed: {fallback_url} -> {res.status}'
+                        )
+                    content_type = res.headers.get('Content-Type',
+                                                   'application/octet-stream')
+                    cache_control = res.headers.get('Cache-Control',
+                                                    'public, max-age=3600')
+                    headers.extend([
+                        ('Content-Type', content_type),
+                        ('Cache-Control', cache_control),
+                    ])
+                    return (res.status, headers, body)
+        except aiohttp.ClientError as exc:
+            logger.warning(f'Fallback asset request failed: {fallback_url} ({exc})')
+            headers.append(('Content-Type', 'text/plain; charset=utf-8'))
+            return (502, headers, b'Fallback asset fetch failed')
+
+    async def handle_http_request(self, path: str):
         parsed = urlsplit(path)
         if parsed.path == '/healthz':
             return (200, [('Content-Type', 'text/plain')], b'OK\n')
@@ -366,10 +394,7 @@ class TsuServer3:
             with open(asset_path, 'rb') as asset_file:
                 return (200, headers, asset_file.read())
 
-        headers.append(
-            ('Location',
-             self.build_fallback_asset_url(relative_path, parsed.query)))
-        return (302, headers, b'')
+        return await self.fetch_fallback_asset(relative_path, parsed.query)
 
     def load_music(self):
         self.build_music_list()

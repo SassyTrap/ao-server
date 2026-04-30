@@ -1,0 +1,91 @@
+# BE VERY CAREFUL ABOUT MODIFYING THIS FILE!
+# YAML has a very nitpicky syntax, and even something as simple as an extra
+# space can cause your server to fail to start.
+# Check your config here: http://www.yamllint.com/
+
+# Name of the server in OOC chat. It should be set to something that cannot
+# be used by other players.
+hostname: <dollar>H
+
+# Max number of player slots to be made. The player limit is not actually
+# enforced, but bad things are supposed to happen if this is exceeded.
+playerlimit: 100
+
+# Port to listen on. You should forward this port on your router.
+port: 27016
+
+# Whether or not this server can only be accessed by the local machine it is
+# being hosted on.
+local: false
+
+# Moderator password.
+# A more complex mod password configuration:
+#
+# modpass:
+#   mod1:
+#     password: foo
+#   mod2:
+#     password: bar
+#
+# You can add, remove, or change passwords for individual users.
+# When they are changed using /refresh, the affected users' mod statuses are
+# revoked.
+modpass: mod
+
+# Sent to joining players.
+motd: Welcome to my server!
+
+# Whether or not the server is open to webAO connections.
+# The websocket port must be different from the main server port
+# and must also be forwarded.
+use_websockets: true
+websocket_port: 50001
+# WebAO Asset URL for hosting files. Leave blank to use vanilla
+asset_url:
+
+# Whether or not the server should be advertised on the server list.
+use_masterserver: true
+# How the server should be listed on the server list.
+masterserver_name: Ace Attorney Online Server
+masterserver_description: A brand new AO server hosted on Render!
+# Custom IP address/hostname to use on the server list.
+# For Render, set this to your Render service URL (e.g. my-ao-server.onrender.com)
+masterserver_custom_hostname: my-ao-server.onrender.com
+
+# Timeout for dead connections (in seconds).
+# To prevent issues, this value should be greater than 60.
+timeout: 250
+
+# Enables additional logging.
+debug: false
+
+music_change_floodguard:
+  times_per_interval: 3
+  interval_length: 20
+  mute_length: 180
+
+wtce_floodguard:
+  times_per_interval: 5
+  interval_length: 10
+  mute_length: 1000
+
+# How many subscripts zalgo is stripped by; 3 is recommended as not to hurt special language diacritics
+zalgo_tolerance: 3
+
+# How many simultaneous connections an IP address can make to the server. (Default: 16)
+multiclient_limit: 16
+
+# How many statements a recorded testimony is allowed to contain; recommend this is set reasonably low to prevent using too much memory (default: 30)
+testimony_limit: 30
+
+# Maximum number of characters can a message contain
+max_chars: 256
+
+# How long a ban will last when no duration is given
+default_ban_duration: 6 hours
+
+# Kicks idlers
+idle_timeout:
+  use_idle_timeout: false
+  kick_mods: false
+  length: 300

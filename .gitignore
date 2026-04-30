@@ -1,11 +1,11 @@
 ### Server related
-# Sensitive data
-config/
-storage/**/*.json
-storage/db.sqlite*
-storage/GeoLite*
-logs/**/*.log
-logs/*
+# Sensitive data (allowing for initial setup)
+# config/
+# storage/**/*.json
+# storage/db.sqlite*
+# storage/GeoLite*
+# logs/**/*.log
+# logs/*
 
 ### Python related
 # Virtual environments

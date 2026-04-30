@@ -362,6 +362,7 @@ class TsuServer3:
             '.apng': 'image/apng',
             '.gif': 'image/gif',
             '.ini': 'text/plain; charset=utf-8',
+            '.mp3': 'audio/mpeg',
             '.ogg': 'audio/ogg',
             '.opus': 'audio/ogg',
             '.png': 'image/png',
@@ -415,6 +416,16 @@ class TsuServer3:
                 asset_path = self._resolve_casefold_path(Path(root_dir), parts[1:])
                 if asset_path is not None:
                     return asset_path
+            if root_dir == 'sounds':
+                # webAO requests music under /base/sounds/music/<track>;
+                # map this to the local ./music folder in single-service setups.
+                mapped_parts = parts[1:]
+                if mapped_parts and mapped_parts[0].casefold() == 'music':
+                    mapped_parts = mapped_parts[1:]
+                if mapped_parts:
+                    asset_path = self._resolve_casefold_path(Path('music'), mapped_parts)
+                    if asset_path is not None:
+                        return asset_path
 
         return None
 

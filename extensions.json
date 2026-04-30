@@ -1,0 +1,23 @@
+{
+  "charicon_extensions": [
+    ".png",
+    ".webp"
+  ],
+  "emote_extensions": [
+    ".gif",
+    ".png",
+    ".apng",
+    ".webp",
+    ".webp.static"
+  ],
+  "emotions_extensions": [
+    ".png",
+    ".webp"
+  ],
+  "background_extensions": [
+    ".png",
+    ".gif",
+    ".webp",
+    ".apng"
+  ]
+}

@@ -47,6 +47,7 @@ class TsuServer3:
         'background': ['.png', '.gif'],
         'characters': ['.png', '.gif', '.apng', '.webp', '.webp.static'],
     }
+    ROOT_ASSET_FILES = {'extensions.json', 'evidence.json'}
 
     def __init__(self):
         self.software = 'tsuserver3'
@@ -353,8 +354,13 @@ class TsuServer3:
             if not parts:
                 continue
 
+            if len(parts) == 1 and parts[0] in self.ROOT_ASSET_FILES:
+                root_file = Path(parts[0])
+                if root_file.is_file():
+                    return root_file
+
             root_dir = parts[0].casefold()
-            if root_dir in ('characters', 'music'):
+            if root_dir in ('characters', 'music', 'background'):
                 asset_path = self._resolve_casefold_path(Path(root_dir), parts[1:])
                 if asset_path is not None:
                     return asset_path

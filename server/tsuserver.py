@@ -43,7 +43,7 @@ logger = logging.getLogger('debug')
 class TsuServer3:
     """The main class for tsuserver3 server software."""
     ASSET_FALLBACK_URL = 'https://attorneyoffline.de/base/'
-    ASSET_ROUTE_SEGMENT = 'assets-v2'
+    ASSET_ROUTE_SEGMENT = 'base'
     ASSET_EXTENSION_CANDIDATES = {
         'background': ['.png', '.gif'],
         'characters': ['.png', '.gif', '.apng', '.webp', '.webp.static'],
@@ -424,6 +424,8 @@ class TsuServer3:
 
         asset_prefixes = (
             f'/{self.ASSET_ROUTE_SEGMENT}/',
+            '/base/',
+            '/assets-v2/',
             '/assets/',
         )
         relative_path = None
